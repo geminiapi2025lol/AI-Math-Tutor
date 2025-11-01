@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Math Tutor</title>
+    <script type="importmap">
+    {
+        "imports": {
+            "@google/generative-ai": "https://esm.run/@google/generative-ai"
+        }
+    }
+    </script>
+    <script src="scripts/theme-toggle.js"></script>
+    <script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+</head>
+<body>
+    <div id="welcomeOverlay" class="welcome-overlay">
+        <div class="welcome-modal">
+            <h2>Welcome to AI Math Tutor</h2>
+            <p>My name is Daniel Kulov, and I am a student at Yago International School in Seville, Spain. I am currently in 10th grade (MYP 5).</p>
+            <p>I am the creator of this application, which I developed as part of my Technology class project. The goal of my project is to design and build an AI-based tool that can help students solve and understand mathematical problems across different levels of learning.</p>
+            <button id="welcomeOkayBtn">Okay</button>
+        </div>
+    </div>
+
+    <div class="container">
+        <div class="header">
+            <button id="themeToggleBtn" class="theme-toggle">✨ Switch to Modern</button>
+            <h1>AI Math Tutor</h1>
+            <p>Powered by Google Gemini</p>
+        </div>
+        
+        <div class="main-content">
+            <div class="sidebar">
+                <div class="level-selector">
+                    <h3>Select Your Level</h3>
+                    <button class="level-btn active" data-level="kindergarten">🏫 Kindergarten</button>
+                    <button class="level-btn" data-level="elementary">📚 Elementary (IB PYP)</button>
+                    <button class="level-btn" data-level="middle">🎒 Middle School (IB MYP)</button>
+                    <button class="level-btn" data-level="igcse">📝 IGCSE</button>
+                    <button class="level-btn" data-level="alevel">🎓 A Levels</button>
+                    <button class="level-btn" data-level="advanced">⚡ Advanced A Levels</button>
+                    <button class="level-btn" data-level="further">🚀 Further Maths</button>
+                </div>
+
+                <div class="problem-examples">
+                    <h4>Try Example Problems:</h4>
+                    <button class="example-btn" data-problem="kindergarten">Count from 1 to 20 and add 5+3</button>
+                    <button class="example-btn" data-problem="elementary">Solve 45 ÷ 9 and find 3/4 of 20</button>
+                    <button class="example-btn" data-problem="middle">Solve 2x + 7 = 15</button>
+                    <button class="example-btn" data-problem="igcse">Factorize x² + 5x + 6</button>
+                    <button class="example-btn" data-problem="alevel">Differentiate y = x³ + 2x²</button>
+                    <button class="example-btn" data-problem="advanced">Solve the differential equation dy/dx = 2x</button>
+                    <button class="example-btn" data-problem="further">Find the determinant of a 2x2 matrix</button>
+                </div>
+
+                <div id="apiStatus" class="api-status status-connected">
+                    ✅ Gemini API: Connected and Ready
+                </div>
+            </div>
+
+            <div class="chat-area">
+                <div class="chat-header">
+                    <div class="current-level">Current Level: <span id="currentLevel">Kindergarten</span></div>
+                    <button id="clearChatBtn" class="clear-chat-btn">🗑️ Clear Chat</button>
+                </div>
+                
+                <div class="messages" id="messages">
+                    <div class="message ai-message">
+                        <strong>AI Tutor:</strong> Welcome! I'm your fully operational AI Math Tutor powered by Google Gemini. I can help you with math problems from Kindergarten to Advanced levels. Select your level and ask any math question!
+                    </div>
+                </div>
+                
+                <div class="input-area">
+                    <div class="input-group">
+                        <textarea id="userInput" placeholder="Type your math problem here... (Press Enter to send, Shift+Enter for new line)" rows="3"></textarea>
+                        <button id="sendBtn">Send</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script type="module">
+        import { GoogleGenerativeAI } from "@google/generative-ai";
+        
+        // WARNING: API key is exposed in client-side code
+        // For production, consider using Replit Secrets and a backend proxy
+        const API_KEY = 'AIzaSyCeU4jw2Oq-P67UODkusfcqgn-zcgH9vAA';
+        
+        // Configuration
+        const LEVELS = {
+            kindergarten: {
+                name: "Kindergarten",
+                description: "Basic counting, shapes, and simple arithmetic",
+                prompt: "You are a kindergarten math tutor. Explain concepts using simple language, visual examples, and step-by-step counting. Use fun examples and encourage the student. Always break down problems into the smallest steps."
+            },
+            elementary: {
+                name: "Elementary (IB PYP)",
+                description: "Basic operations, fractions, and problem solving",
+                prompt: "You are an elementary school math tutor following IB PYP framework. Focus on conceptual understanding, real-world applications, and inquiry-based learning. Explain step-by-step with clear reasoning."
+            },
+            middle: {
+                name: "Middle School (IB MYP)",
+                description: "Algebra, geometry, and basic statistics",
+                prompt: "You are a middle school math tutor following IB MYP framework. Emphasize critical thinking, problem-solving strategies, and making connections between mathematical concepts. Provide structured step-by-step solutions."
+            },
+            igcse: {
+                name: "IGCSE",
+                description: "Advanced algebra, trigonometry, and functions",
+                prompt: "You are an IGCSE math tutor. Focus on exam-style questions, clear methodology, and building confidence with complex problems. Provide detailed step-by-step solutions with explanations of the underlying concepts."
+            },
+            alevel: {
+                name: "A Levels",
+                description: "Calculus, advanced algebra, and mechanics",
+                prompt: "You are an A Level math tutor. Emphasize rigorous mathematical reasoning, proof techniques, and applications. Break down complex problems into logical steps with clear explanations at each stage."
+            },
+            advanced: {
+                name: "Advanced A Levels",
+                description: "Complex numbers, differential equations, and vectors",
+                prompt: "You are an Advanced A Level math tutor. Focus on sophisticated problem-solving, theoretical understanding, and advanced applications. Provide comprehensive step-by-step derivations and explanations."
+            },
+            further: {
+                name: "Further Maths",
+                description: "Advanced topics including matrices, complex analysis",
+                prompt: "You are a Further Mathematics tutor. Handle advanced topics with precision, emphasize proof techniques, and provide deep conceptual insights. Break down complex proofs and calculations into manageable steps."
+            }
+        };
+
+        // State management
+        let currentLevel = 'kindergarten';
+        let chatHistory = [];
+        let genAI;
+        let model;
+
+        // DOM Elements
+        const levelButtons = document.querySelectorAll('.level-btn');
+        const currentLevelSpan = document.getElementById('currentLevel');
+        const messagesContainer = document.getElementById('messages');
+        const userInput = document.getElementById('userInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const exampleButtons = document.querySelectorAll('.example-btn');
+        const apiStatus = document.getElementById('apiStatus');
+
+        // Initialize Gemini - REAL IMPLEMENTATION
+        async function initializeGemini() {
+            try {
+                // Initialize the Google Generative AI with the real API key
+                genAI = new GoogleGenerativeAI(API_KEY);
+                model = genAI.getGenerativeModel({ 
+                    model: "gemini-2.5-flash",
+                    generationConfig: {
+                        temperature: 0.3,
+                        topK: 40,
+                        topP: 0.95,
+                        maxOutputTokens: 8192,
+                    },
+                    safetySettings: [
+                        {
+                            category: "HARM_CATEGORY_HARASSMENT",
+                            threshold: "BLOCK_NONE",
+                        },
+                        {
+                            category: "HARM_CATEGORY_HATE_SPEECH",
+                            threshold: "BLOCK_NONE",
+                        },
+                    ],
+                });
+
+                // Test the connection
+                const result = await model.generateContent("Hello");
+                await result.response;
+                
+                apiStatus.textContent = "✅ Gemini API: Connected and Ready";
+                apiStatus.className = "api-status status-connected";
+                
+                console.log("Gemini AI successfully initialized");
+                addMessage('AI Tutor', 'Gemini AI successfully connected! I\'m ready to help with your math problems. Select your level and ask away!', 'ai');
+                
+            } catch (error) {
+                console.error('Error initializing Gemini:', error);
+                apiStatus.textContent = "❌ Gemini API: Connection Failed - " + error.message;
+                apiStatus.className = "api-status status-error";
+                addMessage('AI Tutor', 'Sorry, there was an error connecting to the AI service. Please check your API key and try again.', 'ai');
+            }
+        }
+
+        // Level selection
+        levelButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const level = button.dataset.level;
+                setCurrentLevel(level);
+            });
+        });
+
+        function setCurrentLevel(level) {
+            currentLevel = level;
+            
+            // Update UI
+            levelButtons.forEach(btn => {
+                btn.classList.toggle('active', btn.dataset.level === level);
+            });
+            
+            currentLevelSpan.textContent = LEVELS[level].name;
+            
+            // Add level change message
+            addMessage('AI Tutor', `Switched to ${LEVELS[level].name} level. ${LEVELS[level].description}`, 'ai');
+        }
+
+        // Example problems with REAL level-specific examples
+        exampleButtons.forEach(button => {
+            button.addEventListener('click', () => {
+                const problemType = button.dataset.problem;
+                let problem = '';
+                
+                switch(problemType) {
+                    case 'kindergarten':
+                        problem = 'Can you help me count from 1 to 20 and show me how to add 5 + 3?';
+                        break;
+                    case 'elementary':
+                        problem = 'How do I solve 45 ÷ 9 and can you explain how to find 3/4 of 20?';
+                        break;
+                    case 'middle':
+                        problem = 'I need help solving the equation 2x + 7 = 15 step by step.';
+                        break;
+                    case 'igcse':
+                        problem = 'Can you show me how to factorize the quadratic expression x² + 5x + 6?';
+                        break;
+                    case 'alevel':
+                        problem = 'How do I differentiate the function y = x³ + 2x²? Please explain each step.';
+                        break;
+                    case 'advanced':
+                        problem = 'Solve the differential equation dy/dx = 2x and explain the process.';
+                        break;
+                    case 'further':
+                        problem = 'Find the determinant of the matrix [[2, 3], [1, 4]] and explain the calculation.';
+                        break;
+                }
+                
+                userInput.value = problem;
+            });
+        });
+
+        // Send message - REAL Gemini Integration
+        sendBtn.addEventListener('click', sendMessage);
+        userInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                sendMessage();
+            }
+        });
+
+        async function sendMessage() {
+            const message = userInput.value.trim();
+            if (!message) return;
+
+            // Add user message to chat
+            addMessage('You', message, 'user');
+            userInput.value = '';
+
+            // Show typing indicator
+            const typingIndicator = addTypingIndicator();
+
+            try {
+                // REAL Gemini API call
+                const response = await callGeminiAPI(message, currentLevel);
+                
+                // Remove typing indicator
+                typingIndicator.remove();
+                
+                // Add AI response
+                addMessage('AI Tutor', response, 'ai');
+                
+            } catch (error) {
+                typingIndicator.remove();
+                addMessage('AI Tutor', `Sorry, I encountered an error: ${error.message}. Please try again.`, 'ai');
+                console.error('Error:', error);
+            }
+        }
+
+        // REAL Gemini API Call Function
+        async function callGeminiAPI(message, level) {
+            if (!model) {
+                throw new Error('Gemini model not initialized');
+            }
+
+            const levelPrompt = LEVELS[level].prompt;
+            
+            const fullPrompt = `${levelPrompt}
+
+            Student's question: "${message}"
+
+            Please provide a comprehensive, step-by-step explanation that:
+            1. Breaks down the problem into manageable steps
+            2. Explains the reasoning behind each step
+            3. Uses LaTeX notation for mathematical expressions:
+               - Wrap inline math in \\( ... \\) like \\(x^2 + 5x + 6\\)
+               - Wrap display (centered) math in \\[ ... \\] like \\[\\frac{-b \\pm \\sqrt{b^2-4ac}}{2a}\\]
+            4. Provides the final answer clearly highlighted
+            5. Offers to explain any step in more detail if needed
+
+            Format your response with clear step numbering and LaTeX-formatted mathematical expressions.`;
+
+            try {
+                const result = await model.generateContent(fullPrompt);
+                const response = await result.response;
+                return response.text();
+            } catch (error) {
+                console.error('Gemini API error:', error);
+                throw new Error(`API call failed: ${error.message}`);
+            }
+        }
+
+        function addMessage(sender, text, type) {
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `message ${type}-message`;
+            
+            // Format step-by-step explanations
+            let formattedText = formatResponse(text);
+            
+            // Add timestamp
+            const now = new Date();
+            const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+            
+            // Add copy button for AI messages (will show on hover)
+            const copyBtn = type === 'ai' ? '<button class="copy-btn" onclick="copyMessage(this)">📋 Copy</button>' : '';
+            
+            messageDiv.innerHTML = `<div class="message-header"><strong>${sender}</strong><span class="message-time">${timeStr}</span></div>${formattedText}${copyBtn}`;
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            
+            // Render MathJax if available
+            if (window.MathJax) {
+                MathJax.typesetPromise([messageDiv]).catch((err) => console.log('MathJax error:', err));
+            }
+            
+            // Add to chat history
+            chatHistory.push({ sender, text, type, timestamp: new Date() });
+        }
+        
+        window.copyMessage = function(button) {
+            const messageDiv = button.parentElement;
+            const text = messageDiv.textContent.replace('📋 Copy', '').trim();
+            navigator.clipboard.writeText(text).then(() => {
+                button.textContent = '✅ Copied!';
+                setTimeout(() => button.textContent = '📋 Copy', 2000);
+            });
+        }
+
+        function addTypingIndicator() {
+            const typingDiv = document.createElement('div');
+            typingDiv.className = 'message ai-message';
+            typingDiv.innerHTML = `<strong>AI Tutor:</strong> <span class="typing-indicator">Thinking<span class="typing-dots"></span></span>`;
+            messagesContainer.appendChild(typingDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
+            return typingDiv;
+        }
+
+        function formatResponse(text) {
+            // Convert markdown-style formatting to HTML
+            let formatted = text
+                .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+                .replace(/\*(.*?)\*/g, '<em>$1</em>')
+                .replace(/(\d+\.)\s/g, '<br><strong>$1</strong> ')
+                .replace(/Step\s(\d+):/gi, '<div class="step"><strong>Step $1:</strong>')
+                .replace(/STEP\s(\d+):/gi, '<div class="step"><strong>STEP $1:</strong>');
+
+            // Add step-by-step container if steps are detected
+            if (text.includes('Step') || text.includes('STEP')) {
+                formatted = '<div class="step-by-step">' + formatted + '</div>';
+            }
+
+            // Replace newlines with breaks
+            formatted = formatted.replace(/\n/g, '<br>');
+
+            return formatted;
+        }
+
+        // Clear chat handler
+        document.getElementById('clearChatBtn').addEventListener('click', function() {
+            if (confirm('Are you sure you want to clear the chat history?')) {
+                messagesContainer.innerHTML = '';
+                chatHistory = [];
+                addMessage('AI Tutor', `Chat cleared. I'm ready to help with ${LEVELS[currentLevel].name} math problems!`, 'ai');
+            }
+        });
+
+        // Welcome overlay handler
+        document.getElementById('welcomeOkayBtn').addEventListener('click', function() {
+            document.getElementById('welcomeOverlay').classList.add('hidden');
+        });
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', initializeGemini);
+    </script>
+</body>
+</html>
