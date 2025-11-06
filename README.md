@@ -29,7 +29,7 @@ You can easily switch between two different visual designs:
    - Smooth animations
    - Light gray background
 
-2. **Classic Theme** (Your Original Design)
+2. **Classic Theme** (My Original Design)
    - Bold gradient backgrounds
    - Vibrant blue colors
    - Traditional card-based layout
